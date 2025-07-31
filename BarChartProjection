@@ -3,21 +3,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from IPython.display import Video
+import io # Import the io module
 
 # --- EDIT THESE VARIABLES FOR YOUR CASE ---
 csv_path = 'https://docs.google.com/spreadsheets/d/1UFmh1r-KS2CrzpZTx7EFqa0JNYXfTH08u_dO4frJHs0/export?format=csv&gid=0' # <-- Your Google Drive sheet CSV URL
 x_col = 'Date'                                  # X-axis (time/date) column
-y_before = 'TotalSales'                         # Column for the value before split
-y1_after = 'BranchA_Sales'                      # Branch 1 after split
-y2_after = 'BranchB_Sales'                      # Branch 2 after split
-split_date = '2018-01-01'                       # Point at which to "fragment" (as string)
+y_before = 'Original'                         # Column for the value before split
+y1_after = 'BranchA'                      # Branch 1 after split
+y2_after = 'BranchB'                      # Branch 2 after split
+split_date = '2025-07-23'                       # Point at which to "fragment" (as string)
 fps = 24
 duration_seconds = 6                            # Total animation duration
 save_filename = 'branching_line_animation.mp4'
 # ------------------------------------------------
 
 # --- Read and prepare data ---
-data = pd.read_csv(csv_path)
+# Use io.BytesIO to read the content after potentially downloading it
+try:
+    import requests
+    response = requests.get(csv_path)
+    response.raise_for_status() # Raise an exception for bad status codes
+    data = pd.read_csv(io.BytesIO(response.content))
+except requests.exceptions.RequestException as e:
+    print(f"Error fetching data: {e}")
+    # Handle the error appropriately, maybe exit or use a fallback data
+    exit() # Or sys.exit() or raise an exception
+
 data[x_col] = pd.to_datetime(data[x_col])
 split_point = pd.to_datetime(split_date)
 
