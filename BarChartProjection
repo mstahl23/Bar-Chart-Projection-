@@ -1,0 +1,78 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from IPython.display import Video
+
+# --- EDIT THESE VARIABLES FOR YOUR CASE ---
+csv_path = 'https://docs.google.com/spreadsheets/d/1UFmh1r-KS2CrzpZTx7EFqa0JNYXfTH08u_dO4frJHs0/edit?usp=drive_link' # <-- Your path in Drive
+x_col = 'Date'                                  # X-axis (time/date) column
+y_before = 'TotalSales'                         # Column for the value before split
+y1_after = 'BranchA_Sales'                      # Branch 1 after split
+y2_after = 'BranchB_Sales'                      # Branch 2 after split
+split_date = '2018-01-01'                       # Point at which to "fragment" (as string)
+fps = 24
+duration_seconds = 6                            # Total animation duration
+save_filename = 'branching_line_animation.mp4'
+# ------------------------------------------------
+
+# --- Read and prepare data ---
+data = pd.read_csv(csv_path)
+data[x_col] = pd.to_datetime(data[x_col])
+split_point = pd.to_datetime(split_date)
+
+data = data.sort_values(x_col).reset_index(drop=True)
+
+# Find split index
+split_idx = np.argmax(data[x_col] >= split_point)
+
+n_pre = split_idx + 1 # include split point
+n_post = len(data) - split_idx
+n_frames_pre = int(fps * duration_seconds * n_pre / len(data))
+n_frames_post = int(fps * duration_seconds * n_post / len(data))
+total_frames = n_frames_pre + n_frames_post
+
+# Set up the figure
+fig, ax = plt.subplots()
+ax.set_xlim(data[x_col].min(), data[x_col].max())
+vals = np.concatenate([data[y_before].values, data[y1_after].values, data[y2_after].values])
+ax.set_ylim(np.nanmin(vals)*0.9, np.nanmax(vals)*1.1)
+
+ax.set_xlabel(x_col)
+ax.set_ylabel('Value')
+ax.set_title('Branching Line Animation')
+# Primary/Pre-split line
+(line_before,) = ax.plot([], [], lw=2, color='tab:blue', label='Total')
+# Branch lines
+(line_branch1,) = ax.plot([], [], lw=2, color='tab:orange', ls=':', label='Branch A')
+(line_branch2,) = ax.plot([], [], lw=2, color='tab:green',  ls=':', label='Branch B')
+ax.legend()
+
+def animate(i):
+    if i < n_frames_pre:
+        # Animate the first portion (prior to split)
+        max_idx = int(1 + i * (n_pre-1) / max(1, n_frames_pre-1))
+        line_before.set_data(data[x_col].values[:max_idx+1], data[y_before].values[:max_idx+1])
+        line_branch1.set_data([], [])
+        line_branch2.set_data([], [])
+    else:
+        # Hold full first part, animate both fragments after split
+        line_before.set_data(data[x_col].values[:n_pre], data[y_before].values[:n_pre])
+        # Animate through post-split for both branches
+        frame_in_post = i - n_frames_pre
+        frac = frame_in_post / max(1, n_frames_post-1)
+        upto = int(np.ceil(frac * n_post))
+        # For the branches, always include the split node
+        x_vals_post = data[x_col].values[split_idx:split_idx+upto+1]
+        y1_vals_post = data[y1_after].values[split_idx:split_idx+upto+1]
+        y2_vals_post = data[y2_after].values[split_idx:split_idx+upto+1]
+        line_branch1.set_data(x_vals_post, y1_vals_post)
+        line_branch2.set_data(x_vals_post, y2_vals_post)
+    return line_before, line_branch1, line_branch2
+
+ani = animation.FuncAnimation(
+    fig, animate, frames=total_frames, interval=1000/fps, blit=True, repeat=False
+)
+ani.save(save_filename, writer=animation.FFMpegWriter(fps=fps))
+plt.close(fig)
+display(Video(save_filename, embed=True))
